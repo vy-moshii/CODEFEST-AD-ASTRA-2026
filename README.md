@@ -75,3 +75,52 @@ salida/resumen.json
 
 Estos archivos no forman parte del repositorio debido a su tamaño y son
 generados nuevamente mediante el pipeline. De igual manera el corpus completo no se encuentra en el repo por su tamaño.
+
+## Chunking (Etapa 1 — Etapa 2026)
+
+El pipeline de chunking (`scripts/CHUNKS/chunking.py`) divide documentos en fragmentos respetando límites de oración (completitud lingüística obligatoria para CODEFEST AD ASTRA).
+
+### Features (v2)
+
+- **Segmentación multilingüe**: usa `pysbd` (~22 idiomas) con fallbacks por regex para idiomas no soportados (pt, ko, ms, qu).
+- **Sentence-aware**: empaqueta oraciones completas, nunca corta a mitad de frase.
+- **Paralelización**: `ProcessPoolExecutor` con checkpoint JSONL resumible (no reprocesa si se interrumpe).
+- **Metadata completa**: genera campos obligatorios (`posicion`, `num_tokens`, `fenomeno` como int).
+
+### Ejecución
+
+```bash
+# Instalar dependencias
+pip install -r requirements.txt
+
+# Correr chunking sobre 1745 documentos OK
+python scripts/CHUNKS/chunking.py --procesos 6
+
+# Con checkpoint resumible (si se interrumpe, retoma desde último doc procesado)
+python scripts/CHUNKS/chunking.py --procesos 6 --check-battery
+
+# Desde cero (borra checkpoint anterior)
+python scripts/CHUNKS/chunking.py --procesos 6 --reiniciar
+```
+
+### Salidas
+
+```
+salida/chunks.parquet       # Parquet v2 (77,853+ chunks, multilingüe, sentence-aware)
+salida/errores_chunking.csv # Documentos que fallaron (si aplica)
+salida/.chunking_checkpoint.jsonl  # Checkpoint resumible (se borra al completar)
+```
+
+### Testing
+
+```bash
+# Tests unitarios (fixtures sintéticas, sin corpus real)
+pytest tests/ -m "not slow" -v
+
+# Tests de integración (requiere documentos.parquet)
+pytest tests/ -m slow -v
+```
+
+Campos de `chunks.parquet`:
+- `chunk_id`, `doc_id`, `fuente`, `formato`, `fenomeno` (int), `posicion`, `num_tokens`, `texto`
+- Plus: `observatorio`, `idioma`, `titulo`, `url`, `fecha`, `n_caracteres_chunk`, `n_palabras_chunk`
