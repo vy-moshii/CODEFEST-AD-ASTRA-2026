@@ -1351,7 +1351,10 @@ def main() -> int:
             "initargs": (mem_gib,),
         }
         if tareas_por_worker:
-            kwargs["max_tasks_per_child"] = tareas_por_worker
+            # max_tasks_per_child requires Python 3.11+
+            import sys
+            if sys.version_info >= (3, 11):
+                kwargs["max_tasks_per_child"] = tareas_por_worker
 
         ventana = max(1, workers * 2)
         en_vuelo: dict = {}

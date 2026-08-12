@@ -124,3 +124,48 @@ pytest tests/ -m slow -v
 Campos de `chunks.parquet`:
 - `chunk_id`, `doc_id`, `fuente`, `formato`, `fenomeno` (int), `posicion`, `num_tokens`, `texto`
 - Plus: `observatorio`, `idioma`, `titulo`, `url`, `fecha`, `n_caracteres_chunk`, `n_palabras_chunk`
+
+## Índice vectorial (Etapa 1 — Senior 1)
+
+Genera embeddings con **BAAI/bge-m3** (encoder multilingüe, familia BERT, licencia MIT,
+contexto de 8192 tokens) y construye un índice FAISS (`IndexFlatIP`, búsqueda exacta por
+similitud coseno vía producto interno sobre vectores normalizados).
+
+### Ejecución
+
+```bash
+# Genera entrega/base_vectorial/encoder_bgem3/{index.faiss,metadata.jsonl}
+python scripts/INDICE/generar_indice.py
+
+# Sanity check manual: corre queries de prueba y muestra el top-5
+python scripts/INDICE/sanity_check.py
+```
+
+Cachea los embeddings en `salida_v2/embeddings_bgem3.npy` para no recodificar si un paso
+posterior falla; usar `--force-encode` para regenerar desde cero.
+
+### Notas de diseño
+
+- Corre en un solo proceso (no `ProcessPoolExecutor`): todo el cómputo es en la GPU vía
+  MPS (Apple Silicon), paralelizar entre procesos no ayuda — competirían por el mismo
+  dispositivo y cada uno cargaría el modelo (~2.3GB) por separado.
+- `max_seq_length=2048`: cubre el p99 real del corpus (~1,138 tokens) con margen; solo
+  trunca los pocos chunks de basura de extracción (JSON/CSV sin estructura de oraciones,
+  hasta 47,795 tokens) que si no colapsan el buffer de atención de MPS (`batch_size × heads
+  × seq² `). El texto completo se sigue entregando sin modificar en `metadata.jsonl` — el
+  truncado solo afecta el embedding.
+- `fenomeno` se asigna por institución/carpeta de origen (según ADL), no por tema
+  semántico del documento — algunas instituciones publican contenido de un fenómeno
+  distinto al que su carpeta indica. No usar `fenomeno` como proxy de relevancia temática
+  al validar resultados de búsqueda.
+- Si `faiss` y `torch` se importan en el mismo proceso (p.ej. corriendo toda la suite de
+  tests junta), macOS puede abortar por runtimes de OpenMP duplicados
+  (`Fatal Python error: Aborted`) — mitigado en `tests/conftest.py` con
+  `KMP_DUPLICATE_LIB_OK=TRUE`.
+
+### Testing
+
+```bash
+pytest tests/test_indice_core.py -v          # rápido, sin descargar el modelo
+pytest tests/test_sanity_queries.py -m slow -v  # usa el índice y modelo reales
+```
