@@ -23,3 +23,10 @@ Thumbs.db
 
 OneDrive_2026-08-04.zip
 salida_v2/
+
+# Temporary debugging scripts
+audit.py
+sample_unknown.py
+
+# Corpus symlink (local reference only)
+src/CORPUS CODEFEST AD ASTRA 2026
