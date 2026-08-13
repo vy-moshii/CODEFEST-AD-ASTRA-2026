@@ -30,3 +30,5 @@ sample_unknown.py
 
 # Corpus symlink (local reference only)
 src/CORPUS CODEFEST AD ASTRA 2026
+entrega/base_vectorial/encoder_bgem3/index.faiss
+entrega/base_vectorial/encoder_bgem3/metadata.jsonl
